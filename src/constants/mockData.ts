@@ -173,6 +173,17 @@ export const MOCK_HOME_AI: HomeAIInsight = {
 
 export const MOCK_HOME_ALERTS: HomeAlert[] = [
   {
+    id: 'alt_h0',
+    time: '5 mins ago',
+    deviceName: 'Smart Main Shutoff Valve',
+    zone: 'Underground Sump',
+    severity: 'CRITICAL',
+    title: 'High Pressure Leak Spike',
+    message: 'Abnormal flow rate spike (12.5 L/min) detected in Sump Pump Inlet. Valve safety bypass auto-activated.',
+    actionTaken: 'Emergency pressure relief valve triggered.',
+    isResolved: false,
+  },
+  {
     id: 'alt_h1',
     time: '20 mins ago',
     deviceName: 'Kitchen RO Purifier',
@@ -205,7 +216,19 @@ export const MOCK_HOME_ALERTS: HomeAlert[] = [
     actionTaken: 'Logged to purity timeline.',
     isResolved: true,
   },
+  {
+    id: 'alt_h4',
+    time: '2 days ago',
+    deviceName: 'Bathroom Softener Unit',
+    zone: 'Bathroom Supply',
+    severity: 'WARNING',
+    title: 'High Turbidity Detected',
+    message: 'Turbidity level reached 1.8 NTU during municipal water flush cycle. Filtration bypass active.',
+    actionTaken: 'Auto-backwash initiated.',
+    isResolved: true,
+  },
 ];
+
 
 export const MOCK_HOME_HISTORICAL = {
   daily: [

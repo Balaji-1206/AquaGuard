@@ -102,6 +102,26 @@ export const mockApi = {
     return [...MOCK_HOME_ALERTS];
   },
 
+  async resolveAllAlerts(): Promise<HomeAlert[]> {
+    await delay(300);
+    MOCK_HOME_ALERTS.forEach((alert) => {
+      if (!alert.isResolved) {
+        alert.isResolved = true;
+        alert.actionTaken = 'Batch Resolved by Home Owner';
+      }
+    });
+    return [...MOCK_HOME_ALERTS];
+  },
+
+  async clearResolvedAlerts(): Promise<HomeAlert[]> {
+    await delay(300);
+    const activeAlerts = MOCK_HOME_ALERTS.filter((alert) => !alert.isResolved);
+    MOCK_HOME_ALERTS.length = 0;
+    MOCK_HOME_ALERTS.push(...activeAlerts);
+    return [...MOCK_HOME_ALERTS];
+  },
+
+
   async fetchHistoricalData(period: 'daily' | 'weekly' | 'monthly') {
     await delay(250);
     return MOCK_HOME_HISTORICAL[period];

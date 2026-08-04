@@ -5,7 +5,10 @@ import { mockApi } from '../services/mockApi';
 interface NotificationContextType {
   alerts: SystemAlert[];
   unresolvedCount: number;
+  criticalCount: number;
   resolveAlert: (id: string) => Promise<void>;
+  resolveAllAlerts: () => Promise<void>;
+  clearResolvedAlerts: () => Promise<void>;
   refreshAlerts: () => Promise<void>;
   isLoading: boolean;
 }
@@ -37,14 +40,28 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setAlerts(updated);
   };
 
+  const resolveAllAlerts = async () => {
+    const updated = await mockApi.resolveAllAlerts();
+    setAlerts(updated);
+  };
+
+  const clearResolvedAlerts = async () => {
+    const updated = await mockApi.clearResolvedAlerts();
+    setAlerts(updated);
+  };
+
   const unresolvedCount = alerts.filter((a) => !a.isResolved).length;
+  const criticalCount = alerts.filter((a) => !a.isResolved && a.severity === 'CRITICAL').length;
 
   return (
     <NotificationContext.Provider
       value={{
         alerts,
         unresolvedCount,
+        criticalCount,
         resolveAlert,
+        resolveAllAlerts,
+        clearResolvedAlerts,
         refreshAlerts: fetchAlertsList,
         isLoading,
       }}
@@ -53,6 +70,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     </NotificationContext.Provider>
   );
 };
+
 
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
