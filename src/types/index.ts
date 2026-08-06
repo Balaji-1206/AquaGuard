@@ -111,3 +111,53 @@ export interface AppSettings {
   offlineMode: boolean;
 }
 
+// ─── Novelty 1: Filter Degradation Prediction ─────────────────────────────────
+
+/** Daily load record for one filter — used by the regression engine */
+export interface FilterDayLoad {
+  date: string;           // ISO date string e.g. '2026-07-30'
+  avgTds: number;         // average TDS through that filter that day (ppm)
+  avgTurbidity: number;   // average turbidity (NTU)
+  avgFlowLiters: number;  // total litres passed that day
+}
+
+/** Prediction output from the degradation engine */
+export interface FilterPrediction {
+  filterId: string;
+  predictedDays: number;        // AI-forecast days remaining
+  calendarDays: number;         // Original static calendar estimate
+  confidencePercent: number;    // 0–100
+  degradationTrend: 'ACCELERATING' | 'STABLE' | 'RECOVERING';
+  dailyDegradationRate: number; // % health lost per day at current load
+}
+
+// ─── Novelty 3: Contamination Source Triangulation ────────────────────────────
+
+/** One rule that fired during cross-node correlation */
+export interface CorrelationEvidence {
+  rule: string;        // human-readable rule description
+  nodeId: string;      // which device triggered this
+  metric: string;      // e.g. 'tds', 'turbidity'
+  observedValue: number;
+  threshold: number;
+}
+
+/** Result of a cross-node contamination correlation run */
+export interface ContaminationSourceEvent {
+  id: string;
+  timestamp: string;
+  sourceZone: HomeZoneType;
+  affectedZones: HomeZoneType[];
+  confidence: number;             // 0–100
+  evidenceRules: CorrelationEvidence[];
+  recommendedAction: string;
+}
+
+// ─── Demo Mode ────────────────────────────────────────────────────────────────
+
+export type DemoScenarioName =
+  | 'NORMAL_DAY'
+  | 'HIGH_TDS_EVENT'
+  | 'PIPE_LEAK_EMERGENCY'
+  | 'PH_DROP_ANOMALY'
+  | 'POST_RAIN_TURBIDITY';

@@ -1,5 +1,5 @@
 const express = require('express');
-const { evaluateTelemetryRules } = require('../services/alertEngine');
+const { evaluateTelemetryRules, runCrossNodeCorrelation } = require('../services/alertEngine');
 
 function createTelemetryRouter(dataStore, broadcastWebSocket) {
   const router = express.Router();
@@ -49,7 +49,7 @@ function createTelemetryRouter(dataStore, broadcastWebSocket) {
       };
     }
 
-    // Run rules engine against new reading
+    // ── Per-device rule evaluation ──────────────────────────────────────────
     const ruleResult = evaluateTelemetryRules(device, device.readings, dataStore.alerts);
     if (ruleResult.alerts.length > 0) {
       dataStore.alerts.unshift(...ruleResult.alerts);
@@ -59,7 +59,47 @@ function createTelemetryRouter(dataStore, broadcastWebSocket) {
       device.valveState = 'CLOSED';
     }
 
-    // Broadcast live telemetry & alert update via WebSocket
+    // ── Novelty 3: Cross-node contamination triangulation ───────────────────
+    let contaminationEvent = null;
+    if (dataStore.devices.length >= 2) {
+      contaminationEvent = runCrossNodeCorrelation(dataStore.devices);
+    }
+
+    if (contaminationEvent) {
+      // Create a formatted alert for the correlation result
+      const corrAlert = {
+        id: `ctam_alert_${Date.now()}`,
+        time: 'Just now',
+        deviceName: 'Contamination Source Engine',
+        zone: contaminationEvent.sourceZone,
+        severity: contaminationEvent.confidence >= 80 ? 'CRITICAL' : 'WARNING',
+        title: `Contamination Source Identified: ${contaminationEvent.sourceZone}`,
+        message: `Cross-node analysis identified ${contaminationEvent.sourceZone} as contamination source (${contaminationEvent.confidence}% confidence). Affected: ${contaminationEvent.affectedZones.join(', ')}.`,
+        actionTaken: contaminationEvent.recommendedAction,
+        isResolved: false,
+      };
+
+      // Only add if not a duplicate (deduplicate by sourceZone in last 5 min)
+      const recentDuplicate = dataStore.alerts.find(
+        (a) =>
+          a.zone === contaminationEvent.sourceZone &&
+          a.title.includes('Contamination Source') &&
+          !a.isResolved
+      );
+
+      if (!recentDuplicate) {
+        dataStore.alerts.unshift(corrAlert);
+        ruleResult.alerts.push(corrAlert);
+      }
+
+      // Broadcast CONTAMINATION_SOURCE event
+      broadcastWebSocket({
+        type: 'CONTAMINATION_SOURCE',
+        event: contaminationEvent,
+      });
+    }
+
+    // ── Broadcast live telemetry & alerts ───────────────────────────────────
     broadcastWebSocket({
       type: 'TELEMETRY_UPDATE',
       deviceId,
@@ -73,6 +113,7 @@ function createTelemetryRouter(dataStore, broadcastWebSocket) {
       message: 'Telemetry received',
       valveState: device.valveState,
       alertsTriggered: ruleResult.alerts.length,
+      contaminationEvent: contaminationEvent || null,
     });
   });
 
@@ -98,10 +139,7 @@ function createTelemetryRouter(dataStore, broadcastWebSocket) {
       valveState: device.valveState,
     });
 
-    return res.json({
-      success: true,
-      device,
-    });
+    return res.json({ success: true, device });
   });
 
   // GET /api/alerts — Fetch all alerts
@@ -131,9 +169,16 @@ function createTelemetryRouter(dataStore, broadcastWebSocket) {
     return res.json(dataStore.alerts);
   });
 
+  // GET /api/contamination — Latest cross-node correlation result
+  router.get('/contamination', (req, res) => {
+    if (dataStore.devices.length >= 2) {
+      const event = runCrossNodeCorrelation(dataStore.devices);
+      return res.json(event || { message: 'No contamination pattern detected' });
+    }
+    return res.json({ message: 'Not enough devices for correlation' });
+  });
+
   return router;
 }
 
-module.exports = {
-  createTelemetryRouter,
-};
+module.exports = { createTelemetryRouter };

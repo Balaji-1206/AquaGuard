@@ -6,6 +6,7 @@ import { ThemeProvider, useAppTheme } from './src/context/ThemeContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { WaterDataProvider } from './src/context/WaterDataContext';
 import { NotificationProvider } from './src/context/NotificationContext';
+import { VoiceAlertProvider } from './src/context/VoiceAlertContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { WaterBackground } from './src/components/common/WaterBackground';
 
@@ -59,7 +60,11 @@ export default function App() {
       <AuthProvider>
         <WaterDataProvider>
           <NotificationProvider>
-            <MainAppWrapper />
+            {/* VoiceAlertProvider wraps inside NotificationProvider so it can
+                register the voice callback after both contexts are initialized */}
+            <VoiceAlertProvider>
+              <MainAppWrapper />
+            </VoiceAlertProvider>
           </NotificationProvider>
         </WaterDataProvider>
       </AuthProvider>
