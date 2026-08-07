@@ -13,8 +13,8 @@ export interface BackendConfig {
 
 export const defaultConfig: BackendConfig = {
   baseUrl: 'http://localhost:5000/api',
-  wsUrl: 'ws://localhost:5000',
-  useLiveBackend: false, // Set to true when backend server is running
+  wsUrl: typeof window !== 'undefined' && window.location ? `ws://${window.location.hostname}:5000` : 'ws://172.16.6.192:5000',
+  useLiveBackend: true, // Connected to live backend server
 };
 
 class AquaGuardApiClient {
