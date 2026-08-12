@@ -135,7 +135,7 @@ wss.on('connection', (ws) => {
 });
 
 // Start Server
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`=======================================================`);
   console.log(`💧 AquaGuard Backend Server running on port ${PORT}`);
   console.log(`📡 ESP32 HTTP Ingestion: http://localhost:${PORT}/api/telemetry`);

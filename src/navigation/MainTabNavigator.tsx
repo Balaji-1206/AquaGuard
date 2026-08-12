@@ -127,6 +127,8 @@ const styles = StyleSheet.create({
     bottom: Spacing.md,
     left: Spacing.md,
     right: Spacing.md,
+    maxWidth: 600,
+    alignSelf: 'center',
     height: 66,
     borderRadius: Spacing.borderRadius.xl,
     borderWidth: 1,

@@ -5,7 +5,7 @@
 #include <DallasTemperature.h>
 
 // =============================================================================
-// 1. HARDWARE PIN DEFINITIONS
+// 1. HARDWARE PIN DEFINITIONS 
 // =============================================================================
 #define TDS_PIN         35
 #define TURBIDITY_PIN   34
@@ -19,7 +19,7 @@ const char* WIFI_SSID     = "POTHIGAI HOSTEL";
 const char* WIFI_PASSWORD = "Pothigai@$C%I$T";
 
 // Replace with your computer's local IP address
-const char* BACKEND_ENDPOINT = "http://172.16.6.192:5000/api/telemetry";
+const char* BACKEND_ENDPOINT = "http://172.16.10.38:5000/api/telemetry";  //172.16.10.38
 
 const char* DEVICE_ID   = "DEV-RO-01";
 const char* DEVICE_NAME = "Kitchen RO Purifier";
@@ -37,6 +37,7 @@ void setup() {
   Serial.println("\n🚀 Starting AquaGuard ESP32 Sensor Node...");
 
   sensors.begin();
+  sensors.setWaitForConversion(false); // Non-blocking temperature conversion (prevents Wi-Fi stack freezes)
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW); // LOW = Safe / Valve Open
@@ -91,6 +92,8 @@ void loop() {
     // 6. Send telemetry payload to backend
     sendTelemetryToBackend(mockPH, tdsPpm, turbidityNTU, temperature, 1.5);
   }
+
+  delay(10); // Allow FreeRTOS Wi-Fi task time to handle network packets
 }
 
 // =============================================================================
@@ -99,44 +102,53 @@ void loop() {
 void sendTelemetryToBackend(float pH, int tds, float turbidity, float temp, float flowRate) {
   if (WiFi.status() != WL_CONNECTED) return;
 
+  WiFiClient client;
   HTTPClient http;
-  http.begin(BACKEND_ENDPOINT);
-  http.addHeader("Content-Type", "application/json");
 
-  // Create JSON Document
-  StaticJsonDocument<256> doc;
-  doc["deviceId"]    = DEVICE_ID;
-  doc["deviceName"]  = DEVICE_NAME;
-  doc["zone"]        = HOME_ZONE;
-  doc["pH"]          = pH;
-  doc["tds"]         = tds;
-  doc["turbidity"]   = turbidity;
-  doc["temperature"] = temp;
-  doc["flowRate"]    = flowRate;
+  http.setTimeout(3000); // 3 seconds timeout
+  
+  if (http.begin(client, BACKEND_ENDPOINT)) {
+    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Connection", "close"); // Force TCP socket close to prevent socket leaks
 
-  String jsonPayload;
-  serializeJson(doc, jsonPayload);
+    // Create JSON Document
+    StaticJsonDocument<256> doc;
+    doc["deviceId"]    = DEVICE_ID;
+    doc["deviceName"]  = DEVICE_NAME;
+    doc["zone"]        = HOME_ZONE;
+    doc["pH"]          = pH;
+    doc["tds"]         = tds;
+    doc["turbidity"]   = turbidity;
+    doc["temperature"] = temp;
+    doc["flowRate"]    = flowRate;
 
-  int httpCode = http.POST(jsonPayload);
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
 
-  if (httpCode > 0) {
-    String response = http.getString();
-    Serial.printf("✅ Server Response (%d): %s\n", httpCode, response.c_str());
+    int httpCode = http.POST(jsonPayload);
 
-    // Check if Backend commanded Valve Shutoff
-    if (response.indexOf("\"valveState\":\"CLOSED\"") > 0) {
-      Serial.println("🚨 EMERGENCY SHUTOFF COMMAND RECEIVED FROM SERVER! Closing Relay Valve...");
-      digitalWrite(LED_PIN, HIGH);
+    if (httpCode > 0) {
+      String response = http.getString();
+      Serial.printf("✅ Server Response (%d): %s\n", httpCode, response.c_str());
+
+      // Check if Backend commanded Valve Shutoff
+      if (response.indexOf("\"valveState\":\"CLOSED\"") > 0) {
+        Serial.println("🚨 EMERGENCY SHUTOFF COMMAND RECEIVED FROM SERVER! Closing Relay Valve...");
+        digitalWrite(LED_PIN, HIGH);
+      }
+    } else {
+      Serial.printf("❌ HTTP POST Failed, Error: %s (%d)\n", http.errorToString(httpCode).c_str(), httpCode);
     }
-  } else {
-    Serial.printf("❌ HTTP POST Failed, Error: %s\n", http.errorToString(httpCode).c_str());
-  }
 
-  http.end();
+    http.end();
+  } else {
+    Serial.println("❌ HTTP Begin Failed: Unable to connect to backend endpoint.");
+  }
 }
 
 void connectToWiFi() {
   Serial.printf("📶 Connecting to Wi-Fi SSID: %s", WIFI_SSID);
+  WiFi.setSleep(false); // Disable WiFi sleep mode for rock-solid network stability
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   int retries = 0;
   while (WiFi.status() != WL_CONNECTED && retries < 20) {

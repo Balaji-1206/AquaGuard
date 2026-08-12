@@ -13,7 +13,7 @@ export interface BackendConfig {
 
 export const defaultConfig: BackendConfig = {
   baseUrl: 'http://localhost:5000/api',
-  wsUrl: typeof window !== 'undefined' && window.location ? `ws://${window.location.hostname}:5000` : 'ws://172.16.6.192:5000',
+  wsUrl: typeof window !== 'undefined' && window.location ? `ws://${window.location.hostname}:5000` : 'ws://172.16.10.38:5000',
   useLiveBackend: true, // Connected to live backend server
 };
 
