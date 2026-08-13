@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { mockApi } from '../services/mockApi';
 import { mqttSimulator } from '../services/mqttSimulator';
+import { apiClient } from '../services/apiClient';
 
 interface WaterDataContextType {
   devices: SmartWaterDevice[];
@@ -38,8 +39,16 @@ export const WaterDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const loadAllData = async () => {
     try {
       setIsLoading(true);
-      const devs = await mockApi.fetchHomeDevices();
+      let devs: SmartWaterDevice[] = [];
+      try {
+        devs = await apiClient.fetchDevices();
+      } catch (e) {
+        devs = await mockApi.fetchHomeDevices();
+      }
       setDevices(devs);
+      if (devs.length > 0 && devs[0].readings) {
+        setLiveReading(devs[0].readings);
+      }
       const filts = await mockApi.fetchROFilters();
       setFilters(filts);
       const tInfo = await mockApi.fetchTankInfo();
@@ -60,9 +69,10 @@ export const WaterDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (!isLiveUpdating) return;
 
-    mqttSimulator.start();
+    // Connect to live WebSocket backend server
+    apiClient.configure({ useLiveBackend: true });
 
-    const unsubscribeTelemetry = mqttSimulator.subscribeTelemetry((reading) => {
+    const updateReading = (reading: SensorReading) => {
       setLiveReading(reading);
       setDevices((prev) => {
         if (prev.length === 0) return prev;
@@ -74,6 +84,15 @@ export const WaterDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
         return updated;
       });
+    };
+
+    // Subscribe to live WebSocket feed from backend (ESP32 data)
+    const unsubscribeApi = apiClient.subscribeTelemetry(updateReading);
+
+    // Simulator fallback
+    mqttSimulator.start();
+    const unsubscribeTelemetry = mqttSimulator.subscribeTelemetry((reading) => {
+      // Keep simulator running for background fallback if needed
     });
 
     const unsubscribeStatus = mqttSimulator.subscribeStatus((status) => {
@@ -81,6 +100,7 @@ export const WaterDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     return () => {
+      unsubscribeApi();
       unsubscribeTelemetry();
       unsubscribeStatus();
     };
