@@ -19,7 +19,7 @@ const char* WIFI_SSID     = "POTHIGAI HOSTEL";
 const char* WIFI_PASSWORD = "Pothigai@$C%I$T";
 
 // Replace with your computer's local IP address
-const char* BACKEND_ENDPOINT = "http://172.16.10.38:5000/api/telemetry";  //172.16.10.38
+const char* BACKEND_ENDPOINT = "http://172.16.10.147:5000/api/telemetry";  //172.16.10.38
 
 const char* DEVICE_ID   = "DEV-RO-01";
 const char* DEVICE_NAME = "Kitchen RO Purifier";
