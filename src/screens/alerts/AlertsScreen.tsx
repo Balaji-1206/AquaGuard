@@ -12,14 +12,18 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useNotifications } from '../../context/NotificationContext';
+import { useWaterData } from '../../context/WaterDataContext';
 import { useAppTheme } from '../../context/ThemeContext';
 import { AlertFilterBar, FilterCategory } from '../../components/alerts/AlertFilterBar';
 import { AlertCard } from '../../components/alerts/AlertCard';
+import { EarlyWarningScoreWidget } from '../../components/alerts/EarlyWarningScoreWidget';
+import { calculateEarlyWarningScore } from '../../services/earlyWarningScoreEngine';
 import { Skeleton } from '../../components/common/Skeleton';
 import { Typography, Spacing } from '../../theme';
 
 export const AlertsScreen: React.FC = () => {
   const navigation = useNavigation();
+  const { liveReading } = useWaterData();
   const {
     alerts,
     unresolvedCount,
@@ -36,6 +40,12 @@ export const AlertsScreen: React.FC = () => {
   const [selectedFilter, setSelectedFilter] = useState<FilterCategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Compute real-time Early Warning Score (EWS) from active telemetry
+  const ewsResult = useMemo(() => {
+    return calculateEarlyWarningScore(liveReading);
+  }, [liveReading]);
+
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -80,147 +90,6 @@ export const AlertsScreen: React.FC = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={[styles.mainContainer, { backgroundColor: theme.colors.background }]}>
-        
-        {/* Top Screen Navigation Header */}
-        <View style={styles.topNavRow}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
-              styles.backBtn,
-              { backgroundColor: theme.isDark ? '#1C2541' : '#FFFFFF', borderColor: theme.colors.border },
-            ]}
-            onPress={() => {
-              if (navigation.canGoBack()) {
-                navigation.goBack();
-              } else {
-                navigation.navigate('DashboardHome' as never);
-              }
-            }}
-          >
-            <Text style={[styles.backBtnText, { color: theme.colors.textPrimary }]}>← Back</Text>
-          </TouchableOpacity>
-
-          <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>Notifications</Text>
-
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={[
-              styles.syncPill,
-              { backgroundColor: theme.isDark ? '#1C2541' : '#E0F2FE', borderColor: theme.colors.border },
-            ]}
-            onPress={handleRefresh}
-          >
-            <Text style={[styles.syncPillText, { color: theme.colors.primary }]}>🔄 Sync</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Hero System Status Banner */}
-        <LinearGradient
-          colors={theme.isDark ? ['#1E293B', '#0F172A'] : ['#0284C7', '#0EA5E9']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.heroCard}
-        >
-          <View style={styles.heroTextSection}>
-            <View style={styles.heroHeaderRow}>
-              <Text style={styles.heroTitle}>AquaGuard Safety Center</Text>
-              <View style={styles.heroLiveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>LIVE</Text>
-              </View>
-            </View>
-            <Text style={styles.heroSub}>
-              {unresolvedCount > 0
-                ? `Attention needed: ${unresolvedCount} unresolved incident${unresolvedCount > 1 ? 's' : ''}`
-                : 'All home sensors operating within normal thresholds'}
-            </Text>
-          </View>
-
-          {/* Quick Metrics Grid */}
-          <View style={styles.metricsRow}>
-            <View style={styles.metricItem}>
-              <Text style={styles.metricVal}>{unresolvedCount}</Text>
-              <Text style={styles.metricLabel}>Pending</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricVal, { color: criticalCount > 0 ? '#F87171' : '#38BDF8' }]}>
-                {criticalCount}
-              </Text>
-              <Text style={styles.metricLabel}>Critical</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={[styles.metricVal, { color: '#34D399' }]}>
-                {filterCounts.RESOLVED}
-              </Text>
-              <Text style={styles.metricLabel}>Resolved</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* Search Bar Input */}
-        <View style={styles.searchSection}>
-          <View
-            style={[
-              styles.searchBox,
-              {
-                backgroundColor: theme.colors.card,
-                borderColor: theme.colors.border,
-              },
-            ]}
-          >
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={[styles.searchInput, { color: theme.colors.textPrimary }]}
-              placeholder="Search by zone, alert title, or device..."
-              placeholderTextColor={theme.colors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Text style={styles.clearSearchBtn}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* Category Filter Chips Bar */}
-        <AlertFilterBar
-          selectedFilter={selectedFilter}
-          onSelectFilter={setSelectedFilter}
-          counts={filterCounts}
-        />
-
-        {/* Quick Batch Actions */}
-        <View style={styles.batchActionsRow}>
-          {unresolvedCount > 0 && (
-            <TouchableOpacity
-              activeOpacity={0.75}
-              style={[styles.batchBtn, { backgroundColor: theme.isDark ? '#1E293B' : '#E2E8F0' }]}
-              onPress={resolveAllAlerts}
-            >
-              <Text style={[styles.batchBtnText, { color: theme.colors.textPrimary }]}>
-                ✓ Resolve All ({unresolvedCount})
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {filterCounts.RESOLVED > 0 && (
-            <TouchableOpacity
-              activeOpacity={0.75}
-              style={[styles.batchBtn, { backgroundColor: theme.isDark ? '#1E293B' : '#E2E8F0' }]}
-              onPress={clearResolvedAlerts}
-            >
-              <Text style={[styles.batchBtnText, { color: theme.colors.textMuted }]}>
-                🗑️ Clear Resolved
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Alerts Feed List */}
         {isLoading ? (
           <View style={styles.skeletonFeed}>
             <Skeleton height={140} borderRadius={16} />
@@ -233,6 +102,151 @@ export const AlertsScreen: React.FC = () => {
             renderItem={({ item }) => (
               <AlertCard alert={item} onResolve={resolveAlert} />
             )}
+            ListHeaderComponent={
+              <View style={{ paddingBottom: 10 }}>
+                {/* Top Screen Navigation Header */}
+                <View style={styles.topNavRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.backBtn,
+                      { backgroundColor: theme.isDark ? '#1C2541' : '#FFFFFF', borderColor: theme.colors.border },
+                    ]}
+                    onPress={() => {
+                      if (navigation.canGoBack()) {
+                        navigation.goBack();
+                      } else {
+                        navigation.navigate('DashboardHome' as never);
+                      }
+                    }}
+                  >
+                    <Text style={[styles.backBtnText, { color: theme.colors.textPrimary }]}>← Back</Text>
+                  </TouchableOpacity>
+
+                  <Text style={[styles.headerTitle, { color: theme.colors.textPrimary }]}>Notifications</Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[
+                      styles.syncPill,
+                      { backgroundColor: theme.isDark ? '#1C2541' : '#E0F2FE', borderColor: theme.colors.border },
+                    ]}
+                    onPress={handleRefresh}
+                  >
+                    <Text style={[styles.syncPillText, { color: theme.colors.primary }]}>🔄 Sync</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Hero System Status Banner */}
+                <LinearGradient
+                  colors={theme.isDark ? ['#1E293B', '#0F172A'] : ['#0284C7', '#0EA5E9']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.heroCard}
+                >
+                  <View style={styles.heroTextSection}>
+                    <View style={styles.heroHeaderRow}>
+                      <Text style={styles.heroTitle}>AquaGuard Safety Center</Text>
+                      <View style={styles.heroLiveBadge}>
+                        <View style={styles.liveDot} />
+                        <Text style={styles.liveText}>LIVE</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.heroSub}>
+                      {unresolvedCount > 0
+                        ? `Attention needed: ${unresolvedCount} unresolved incident${unresolvedCount > 1 ? 's' : ''}`
+                        : 'All home sensors operating within normal thresholds'}
+                    </Text>
+                  </View>
+
+                  {/* Quick Metrics Grid */}
+                  <View style={styles.metricsRow}>
+                    <View style={styles.metricItem}>
+                      <Text style={styles.metricVal}>{unresolvedCount}</Text>
+                      <Text style={styles.metricLabel}>Pending</Text>
+                    </View>
+                    <View style={styles.metricDivider} />
+                    <View style={styles.metricItem}>
+                      <Text style={[styles.metricVal, { color: criticalCount > 0 ? '#F87171' : '#38BDF8' }]}>
+                        {criticalCount}
+                      </Text>
+                      <Text style={styles.metricLabel}>Critical</Text>
+                    </View>
+                    <View style={styles.metricDivider} />
+                    <View style={styles.metricItem}>
+                      <Text style={[styles.metricVal, { color: '#34D399' }]}>
+                        {filterCounts.RESOLVED}
+                      </Text>
+                      <Text style={styles.metricLabel}>Resolved</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+
+                {/* Early Warning Score (EWS) Interactive Model Widget */}
+                <EarlyWarningScoreWidget ewsResult={ewsResult} />
+
+                {/* Search Bar Input */}
+                <View style={styles.searchSection}>
+                  <View
+                    style={[
+                      styles.searchBox,
+                      {
+                        backgroundColor: theme.colors.card,
+                        borderColor: theme.colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.searchIcon}>🔍</Text>
+                    <TextInput
+                      style={[styles.searchInput, { color: theme.colors.textPrimary }]}
+                      placeholder="Search by zone, alert title, or device..."
+                      placeholderTextColor={theme.colors.textMuted}
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                    {searchQuery.length > 0 && (
+                      <TouchableOpacity onPress={() => setSearchQuery('')}>
+                        <Text style={styles.clearSearchBtn}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* Category Filter Chips Bar */}
+                <AlertFilterBar
+                  selectedFilter={selectedFilter}
+                  onSelectFilter={setSelectedFilter}
+                  counts={filterCounts}
+                />
+
+                {/* Quick Batch Actions */}
+                <View style={styles.batchActionsRow}>
+                  {unresolvedCount > 0 && (
+                    <TouchableOpacity
+                      activeOpacity={0.75}
+                      style={[styles.batchBtn, { backgroundColor: theme.isDark ? '#1E293B' : '#E2E8F0' }]}
+                      onPress={resolveAllAlerts}
+                    >
+                      <Text style={[styles.batchBtnText, { color: theme.colors.textPrimary }]}>
+                        ✓ Resolve All ({unresolvedCount})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {filterCounts.RESOLVED > 0 && (
+                    <TouchableOpacity
+                      activeOpacity={0.75}
+                      style={[styles.batchBtn, { backgroundColor: theme.isDark ? '#1E293B' : '#E2E8F0' }]}
+                      onPress={clearResolvedAlerts}
+                    >
+                      <Text style={[styles.batchBtnText, { color: theme.colors.textMuted }]}>
+                        🗑️ Clear Resolved
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            }
             refreshControl={
               <RefreshControl
                 refreshing={isRefreshing}
@@ -443,7 +457,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingTop: 4,
-    paddingBottom: 120, // Avoid bottom tab bar overlap
+    paddingBottom: 160, // Avoid bottom tab bar overlap
   },
   emptyCard: {
     alignItems: 'center',

@@ -161,3 +161,27 @@ export type DemoScenarioName =
   | 'PIPE_LEAK_EMERGENCY'
   | 'PH_DROP_ANOMALY'
   | 'POST_RAIN_TURBIDITY';
+
+// ─── Early Warning Score (EWS) Model Types ───────────────────────────────────
+
+export type EWSRiskTier = 'NORMAL' | 'WARNING' | 'CRITICAL';
+
+
+export interface EWSBreakdown {
+  phScore: number;          // 0-25
+  tdsScore: number;         // 0-25
+  turbidityScore: number;   // 0-25
+  flowScore: number;        // 0-25
+  velocityBonus: number;    // 0-20 (rate of change penalty)
+}
+
+export interface EarlyWarningScoreResult {
+  ewsScore: number;               // Composite score 0 - 100
+  riskTier: EWSRiskTier;          // LOW | MODERATE | HIGH | CRITICAL
+  breakdown: EWSBreakdown;        // Parameter breakdown sub-scores
+  primaryRiskFactor: string;      // Dominant parameter driving elevated EWS
+  recommendation: string;         // Actionable advice for home owner
+  trend: 'STABLE' | 'DETERIORATING' | 'RAPIDLY_DETERIORATING';
+  calculatedAt: string;
+}
+

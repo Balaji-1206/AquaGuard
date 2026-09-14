@@ -142,3 +142,6 @@ export const useWaterDataContext = () => {
   }
   return context;
 };
+
+export const useWaterData = useWaterDataContext;
+
