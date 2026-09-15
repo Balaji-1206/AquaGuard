@@ -178,7 +178,24 @@ function createTelemetryRouter(dataStore, broadcastWebSocket) {
     return res.json({ message: 'Not enough devices for correlation' });
   });
 
+  // POST /api/ml/predict — ML Model Prediction Endpoint (joblib .pkl model runner)
+  router.post('/ml/predict', async (req, res) => {
+    const { modelName = 'ews', telemetry = {} } = req.body;
+    const mlPredictorService = require('../services/mlPredictorService');
+
+    try {
+      const result = await mlPredictorService.runMlPrediction(modelName, telemetry);
+      return res.json(result);
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        error: err.error || err.message || 'ML Prediction failed',
+      });
+    }
+  });
+
   return router;
 }
 
 module.exports = { createTelemetryRouter };
+

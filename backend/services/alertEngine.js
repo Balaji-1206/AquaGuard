@@ -75,9 +75,26 @@ function evaluateTelemetryRules(device, reading, existingAlerts) {
     });
   }
 
+  // Rule 5: Early Warning Score (EWS) High Risk Threshold (EWS >= 46)
+  const ewsRes = calculateEarlyWarningScore(reading);
+  if (ewsRes.ewsScore >= 46) {
+    generatedAlerts.push({
+      id: `alt_ews_${Date.now()}`,
+      time: 'Just now',
+      deviceName: device.name || 'Hydro Smart Monitor',
+      zone: device.zone || 'Kitchen RO Purifier',
+      severity: ewsRes.riskTier === 'CRITICAL' ? 'CRITICAL' : 'WARNING',
+      title: `Early Warning Score Elevated (${ewsRes.ewsScore}/100 - ${ewsRes.riskTier})`,
+      message: `Multi-parameter water risk score reached ${ewsRes.ewsScore}/100. Trend: ${ewsRes.trend}. Pre-emptive inspection advised.`,
+      actionTaken: 'EWS Early Warning Alert Broadcasted',
+      isResolved: false,
+    });
+  }
+
   return {
     alerts: generatedAlerts,
     emergencyShutoffTriggered,
+    ewsScoreResult: ewsRes,
   };
 }
 
@@ -242,7 +259,56 @@ function getRecommendedAction(sourceZone, evidenceRules) {
   return 'Inspect identified zone and isolate supply using the valve control panel.';
 }
 
+// ─── Early Warning Score (EWS) Calculation Engine ─────────────────────────────
+
+function calculateEarlyWarningScore(reading, previousReadings = []) {
+  const { pH = 7.0, tds = 100, turbidity = 0.5, flowRate = 1.0 } = reading;
+
+  // 1. pH Sub-score (0-25)
+  const phDev = Math.abs(pH - 7.0);
+  let phScore = phDev <= 0.5 ? 0 : phDev <= 1.0 ? 8 : phDev <= 1.5 ? 16 : 25;
+
+  // 2. TDS Sub-score (0-25)
+  let tdsScore = tds <= 150 ? Math.max(0, Math.round(((tds - 50) / 100) * 5)) : tds <= 250 ? 14 : tds <= 400 ? 20 : 25;
+
+  // 3. Turbidity Sub-score (0-25)
+  let turbidityScore = turbidity <= 1.0 ? Math.round((turbidity / 1.0) * 8) : turbidity <= 2.5 ? 16 : 25;
+
+  // 4. Flow Rate Sub-score (0-25)
+  let flowScore = flowRate <= 4.0 ? 0 : flowRate <= 8.0 ? 12 : flowRate <= 12.0 ? 20 : 25;
+
+  // 5. Deterioration Velocity Bonus (0-20)
+  let velocityBonus = 0;
+  let trend = 'STABLE';
+  if (previousReadings.length > 0) {
+    const prev = previousReadings[previousReadings.length - 1];
+    const tdsDelta = tds - (prev.tds || 0);
+    const phDelta = Math.abs(pH - (prev.pH || 7.0));
+    const flowDelta = flowRate - (prev.flowRate || 0);
+    if (tdsDelta > 20 || phDelta > 0.8 || flowDelta > 4.0) {
+      velocityBonus = 20;
+      trend = 'RAPIDLY_DETERIORATING';
+    } else if (tdsDelta > 8 || phDelta > 0.3 || flowDelta > 2.0) {
+      velocityBonus = 10;
+      trend = 'DETERIORATING';
+    }
+  }
+
+  const ewsScore = Math.min(100, Math.max(0, phScore + tdsScore + turbidityScore + flowScore + velocityBonus));
+  let riskTier = ewsScore >= 66 ? 'CRITICAL' : ewsScore >= 26 ? 'WARNING' : 'NORMAL';
+
+  return {
+    ewsScore,
+    riskTier,
+    breakdown: { phScore, tdsScore, turbidityScore, flowScore, velocityBonus },
+    trend,
+    calculatedAt: new Date().toISOString(),
+  };
+}
+
 module.exports = {
   evaluateTelemetryRules,
   runCrossNodeCorrelation,
+  calculateEarlyWarningScore,
 };
+
